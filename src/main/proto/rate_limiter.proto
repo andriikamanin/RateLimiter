@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package ratelimiter.v1;
+
+option java_multiple_files = true;
+option java_package = "com.ratelimiter.grpc.v1";
+option java_outer_classname = "RateLimiterProto";
+
+// RateLimiterService exposes a single low-latency decision endpoint used by
+// upstream services (as a sidecar or shared dependency) to check whether a
+// given request should be allowed to proceed under the configured quotas.
+service RateLimiterService {
+  rpc CheckLimit (RateLimitRequest) returns (RateLimitResponse);
+}
+
+enum Algorithm {
+  ALGORITHM_UNSPECIFIED = 0;
+  TOKEN_BUCKET = 1;
+  LEAKY_BUCKET = 2;
+}
+
+message RateLimitRequest {
+  // Client or request identifier, e.g. "user_123", "ip_192.168.1.1".
+  string key = 1;
+  // Target API route or action, e.g. "/api/v1/checkout".
+  string resource = 2;
+  // Tokens required for the request. Defaults to 1 when unset (<= 0).
+  int32 tokens_requested = 3;
+  Algorithm algorithm = 4;
+}
+
+message RateLimitResponse {
+  bool allowed = 1;
+  int64 remaining_tokens = 2;
+  int64 retry_after_ms = 3;
+}

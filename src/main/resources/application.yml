@@ -1,0 +1,70 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: rate-limiter-service
+  threads:
+    virtual:
+      enabled: true
+
+grpc:
+  server:
+    port: 6565
+    address: 0.0.0.0
+    reflection-service-enabled: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        rate_limiter_latency_seconds: true
+        redis_execution_latency_seconds: true
+      percentiles:
+        rate_limiter_latency_seconds: 0.5,0.95,0.99
+        redis_execution_latency_seconds: 0.5,0.95,0.99
+
+ratelimiter:
+  # FAIL_OPEN: allow traffic through when both Redis and the local fallback
+  # cannot render a decision. FAIL_CLOSED: reject traffic in that scenario.
+  fail-strategy: FAIL_OPEN
+  redis:
+    uri: redis://localhost:6379
+    command-timeout-ms: 150
+    key-ttl-seconds: 120
+  guard-cache:
+    # Negative-cache TTL: once Redis rejects a key, this instance rejects
+    # repeat bursts locally (no Redis round trip) until this window elapses.
+    max-ttl-seconds: 30
+    max-size: 500000
+  local-fallback-cache:
+    max-size: 500000
+    expire-after-access-seconds: 300
+  default-bucket:
+    capacity: 100
+    refill-rate-per-sec: 50
+    leak-rate-per-sec: 50
+  resources:
+    /api/v1/checkout:
+      capacity: 20
+      refill-rate-per-sec: 5
+      leak-rate-per-sec: 5
+    /api/v1/search:
+      capacity: 200
+      refill-rate-per-sec: 100
+      leak-rate-per-sec: 100
+
+logging:
+  level:
+    com.ratelimiter: INFO
